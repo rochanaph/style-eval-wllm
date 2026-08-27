@@ -17,12 +17,13 @@
 # Description: Implementation of SIR algorithm
 # ============================================
 
+import os
 import json
 import torch
-import jieba
 import random
 import numpy as np
 from functools import partial
+from constants import PROJECT_ROOT
 from ..base import BaseWatermark, BaseConfig
 from .transform_model import TransformModel
 from utils.transformers_config import TransformersConfig
@@ -32,9 +33,16 @@ from utils.utils import create_directory_for_file, load_config_file
 from transformers import LogitsProcessor, LogitsProcessorList, BertTokenizer, BertModel
 
 
+def _absolute_path(path: str) -> str:
+    """Resolve a config path against the project root if it is relative."""
+    if os.path.isabs(path):
+        return path
+    return os.path.join(PROJECT_ROOT, path)
+
+
 class SIRConfig(BaseConfig):
     """Config class for SIR algorithm, load config file and initialize parameters."""
-    
+
     def initialize_parameters(self) -> None:
         """Initialize algorithm-specific parameters."""
         self.delta = self.config_dict['delta']
@@ -42,9 +50,22 @@ class SIRConfig(BaseConfig):
         self.scale_dimension = self.config_dict['scale_dimension']
         self.z_threshold = self.config_dict['z_threshold']
         self.transform_model_input_dim = self.config_dict['transform_model_input_dim']
-        self.transform_model_name = self.config_dict['transform_model_name']
-        self.embedding_model_path = self.config_dict['embedding_model_path']
-        self.mapping_name = self.config_dict['mapping_name']
+
+        # The config file keeps model paths relative to the project root, so the
+        # repository stays portable. Make them absolute here.
+        self.transform_model_name = _absolute_path(self.config_dict['transform_model_name'])
+        self.embedding_model_path = _absolute_path(self.config_dict['embedding_model_path'])
+
+        # Auto-detect correct mapping file based on vocab size
+        mapping_template = _absolute_path(self.config_dict['mapping_name'])
+        if self.vocab_size is not None:
+            # Replace the vocab size in the mapping filename with actual vocab size
+            mapping_dir = os.path.dirname(mapping_template)
+            mapping_filename = f"300_mapping_{self.vocab_size}.json"
+            self.mapping_name = os.path.join(mapping_dir, mapping_filename)
+        else:
+            # Fallback to config file value if vocab_size not available
+            self.mapping_name = mapping_template
     
     @property
     def algorithm_name(self) -> str:
@@ -77,19 +98,21 @@ class SIRUtils:
         return output[0][:, 0, :]
     
     def get_text_split(self, sentence: str) -> list[list[str]]:
-        """Split the input text into chunks of words."""
-        words = list(jieba.cut(sentence))
-        non_space_indices = [index for index, word in enumerate(words) if word.strip()]
+        """Split the input text into chunks of words (English tokenization)."""
+        # Use simple whitespace tokenization for English
+        # This is more reliable than nltk for watermarking purposes
+        words = sentence.split()
+
+        # Filter out empty strings
+        words = [word for word in words if word.strip()]
+
+        # Create 2D array by chunking words
         words_2d = []
-        chunk_start = 0
-        for i in range(0, len(non_space_indices), self.config.chunk_length):
-            chunk_end = i + self.config.chunk_length
-            chunk_end = min(chunk_end, len(non_space_indices))
-            chunk_indices = non_space_indices[:chunk_end]
-            if chunk_indices:
-                chunk = words[chunk_start:chunk_indices[-1] + 1]
+        for i in range(0, len(words), self.config.chunk_length):
+            chunk = words[i:i + self.config.chunk_length]
+            if chunk:
                 words_2d.append(chunk)
-            chunk_start = chunk_indices[-1] + 1
+
         return words_2d
 
     def scale_vector(self, v: np.array) -> np.array:
@@ -227,12 +250,12 @@ class SIR(BaseWatermark):
         # Iterate over each sentence in the split text, skipping the first
         for i in range(1, len(word_2d)):
             # Create the context sentence from all previous text portions
-            context_sentence = ''.join([''.join(group) for group in word_2d[:i]]).strip()
+            context_sentence = ' '.join([' '.join(group) for group in word_2d[:i]]).strip()
             # Current sentence to check against the context
-            current_sentence = ''.join(word_2d[i]).strip()
+            current_sentence = ' '.join(word_2d[i]).strip()
 
             # Continue if the context sentence is shorter than the required chunk length
-            if len(list(jieba.cut(context_sentence))) < self.config.chunk_length:
+            if len(context_sentence.split()) < self.config.chunk_length:
                 continue
 
             # Get embedding of the context sentence

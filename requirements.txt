@@ -1,8 +1,12 @@
+torch
 transformers
-datasets
-nltk
-jieba
 accelerate
+bitsandbytes
+datasets
+huggingface_hub
+nltk
+scikit-learn
+rouge-score
 SentencePiece
 openai==0.28
 matplotlib

@@ -170,7 +170,32 @@ class HumanEvalDataset(BaseDataset):
             self.references.append({'task': prompt, 'test': item['test'], 'entry_point': item['entry_point']})
 
 
+class FactEHRDataset(BaseDataset):
+    """Dataset class for FactEHR dataset."""
+
+    def __init__(self, data_source: str, max_samples: int = 200) -> None:
+        """
+            Initialize the FactEHR dataset.
+
+            Parameters:
+                data_source (str): The path to the FactEHR dataset file.
+        """
+        super().__init__(max_samples)
+        self.data_source = data_source
+        self.load_data()
+
+    def load_data(self):
+        """Load data from the FactEHR dataset file."""
+        with open(self.data_source, 'r') as f:
+            lines = f.readlines()
+        for line in lines[:self.max_samples]:
+            item = json.loads(line)
+            self.prompts.append(item['prompt'])
+            self.natural_texts.append(item['natural_text'])
+
+
 if __name__ == '__main__':
     d1 = C4Dataset('dataset/c4/processed_c4.json', max_samples=100)
     d2 = WMT16DE_ENDataset('dataset/wmt16_de_en/validation.jsonl', max_samples=100)
     d3 = HumanEvalDataset('dataset/HumanEval/test.jsonl', max_samples=100)
+    d4 = FactEHRDataset('dataset/factehr/procedures.jsonl', max_samples=100)

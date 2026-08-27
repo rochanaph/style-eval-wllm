@@ -39,15 +39,12 @@ class DIPConfig(BaseConfig):
         """Initialize algorithm-specific parameters."""
         self.gamma = self.config_dict['gamma']
         self.alpha = self.config_dict['alpha']
+        self.hash_key = random.getrandbits(1024).to_bytes(128, "big")
         self.ignore_history_generation = bool(self.config_dict['ignore_history_generation'])
         self.ignore_history_detection = bool(self.config_dict['ignore_history_detection'])
         self.z_threshold = self.config_dict['z_threshold']
         self.prefix_length = self.config_dict['prefix_length']
-        secret = self.config_dict.get('hash_key', self.config_dict.get('key'))
-        if secret is None:
-            raise ValueError("DIP config must set 'hash_key' or 'key' for RNG seed derivation.")
-        self.hash_key = str(secret).encode('utf-8')
-
+    
     @property
     def algorithm_name(self) -> str:
         """Return the algorithm name."""
