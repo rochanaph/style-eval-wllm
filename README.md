@@ -1,6 +1,6 @@
 # Evaluating LLM Watermarking for Clinical EHR: Detectability, Style Shifts, and Helpfulness
 
-Code for the EMNLP 2026 Main Conference paper.
+Code for the EMNLP 2026 paper.
 
 This repository is a fork of [MarkLLM](https://github.com/THU-BPM/MarkLLM). The pipeline
 has three stages: generate watermarked and unwatermarked text, measure how detectable the
