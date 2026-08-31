@@ -19,6 +19,9 @@
 
 from typing import List, Dict, Union
 from exceptions.exceptions import TypeMismatchException, ConfigurationError
+from sklearn.metrics import roc_auc_score
+from sklearn import metrics
+import numbers
 
 
 class DetectionResult:
@@ -50,7 +53,11 @@ class BaseSuccessRateCalculator:
     def _check_instance(self, data: List[Union[bool, float]], expected_type: type):
         """Check if the data is an instance of the expected type."""
         for d in data:
-            if not isinstance(d, expected_type):
+            # For float type, accept any numeric type (handles numpy.float32, etc.)
+            if expected_type == float:
+                if not isinstance(d, numbers.Real):
+                    raise TypeMismatchException(expected_type, type(d))
+            elif not isinstance(d, expected_type):
                 raise TypeMismatchException(expected_type, type(d))
     
     def _filter_metrics(self, metrics: Dict[str, float]) -> Dict[str, float]:
@@ -139,12 +146,12 @@ class DynamicThresholdSuccessRateCalculator(BaseSuccessRateCalculator):
                 rule (str): The rule for determining the threshold. Choose from 'best' or 'target_fpr'.
                 target_fpr (float): The target false positive rate to achieve.
                 reverse (bool): Whether to reverse the sorting order of the detection results.
-                                False: higher values are considered positive.
-                                True: lower values are considered positive.
+                                True: higher values are considered positive.
+                                False: lower values are considered positive.
         """
         super().__init__(labels)
         self.rule = rule
-        self.target_fpr = target_fpr
+        self.target_fpr = target_fpr if rule == 'target_fpr' else None
         self.reverse = reverse
         
         # Validate rule configuration
@@ -216,6 +223,18 @@ class DynamicThresholdSuccessRateCalculator(BaseSuccessRateCalculator):
         }
         return metrics
 
+    def _compute_auroc(self, inputs: List[DetectionResult]) -> float:
+        """Compute Area Under ROC curve."""
+        y_true = [x.gold_label for x in inputs]
+        y_score = [x.detect_result for x in inputs]
+        
+        fpr, tpr, thresholds = metrics.roc_curve(y_true, y_score, pos_label=1)
+        roc_auc = metrics.auc(fpr, tpr)
+
+        # roc_auc_score(y_true, y_score, max_fpr=self.target_fpr)
+        
+        return roc_auc, thresholds, fpr, tpr
+
     def calculate(self, watermarked_result: List[float], non_watermarked_result: List[float]) -> Dict[str, float]:
         """Calculate success rates based on provided results."""
         self._check_instance(watermarked_result + non_watermarked_result, float)
@@ -223,4 +242,13 @@ class DynamicThresholdSuccessRateCalculator(BaseSuccessRateCalculator):
         inputs = [DetectionResult(True, x) for x in watermarked_result] + [DetectionResult(False, x) for x in non_watermarked_result]
         threshold = self._find_threshold(inputs)
         metrics = self._compute_metrics(inputs, threshold)
+        metrics['Threshold'] = threshold
+
+        if "AUROC" in self.labels:
+            auroc = self._compute_auroc(inputs)
+            metrics['AUROC'] = auroc[0]
+            metrics['AUROC_thresholds'] = auroc[1]
+            metrics['AUROC_fpr'] = auroc[2]
+            metrics['AUROC_tpr'] = auroc[3]
+        
         return self._filter_metrics(metrics)

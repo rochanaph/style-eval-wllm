@@ -6,7 +6,11 @@ datasets
 huggingface_hub
 nltk
 scikit-learn
+scipy
+pandas
 rouge-score
+evaluate
+bert-score
 SentencePiece
 openai==0.28
 matplotlib

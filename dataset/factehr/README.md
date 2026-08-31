@@ -139,7 +139,7 @@ wc -l *.jsonl
 ```
 
 Expect 200, 200, 100 and 100 lines. Then run the generation as described in
-`../../README_REPRODUCE.md`.
+`../../README.md`.
 
 ## Note on sample counts
 

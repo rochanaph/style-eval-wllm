@@ -17,6 +17,7 @@ watermark/xsir/model/paraphrase-multilingual-mpnet-base-v2/
 
 # Generation outputs
 logs/
+results/
 
 # FactEHR notes come from MedAlign and are under a Stanford Dataset DUA.
 # They must not be redistributed. See dataset/factehr/README.md to build them.
